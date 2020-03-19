@@ -11,13 +11,15 @@ library(magrittr)
 library(parallel)
 
 BATCH.SIZE <- 20 # how many files to process per go
+taskid <- 0
 library(randomFunctions)
 args <- getArgs()
 print(args)
-taskid=as.numeric(args$taskid)
 if("BATCH.SIZE" %in% names(args))
   BATCH.SIZE <- as.numeric(args$BATCH.SIZE)
-
+if("taskid" %in% names(args))
+  taskid=as.numeric(args$taskid)
+  
 
 setwd("/home/cew54/share/Projects/twas/sims")
 do.gwas <- function(y, geno, stratum = NULL, cc = FALSE) {
@@ -36,11 +38,10 @@ do.gwas <- function(y, geno, stratum = NULL, cc = FALSE) {
 FF <- list.files(pattern = "simv6")
 ## FF <- FF[!(FF %in% err$file)]
 files.done <- list.files("results")
-files.todo <- FF[ (taskid * BATCH.SIZE + 1):((taskid+1)*BATCH.SIZE) ]  %>% 
-  setdiff(., files.done)
+files.todo <- setdiff(FF, files.done)[ (taskid * BATCH.SIZE + 1):((taskid+1)*BATCH.SIZE) ]   
 message("running ",length(files.todo)," files.")
 
-for(m in sample(files.todo,min(BATCH.SIZE,length(files.todo)))) {
+for(m in sample(files.todo)) {
   if(file.exists(file.path("results", m)))
     next
   message("\n",m)
@@ -162,7 +163,7 @@ do.twas <- function(preds, y) {
 
 #------------------------
 ##coloc
-if(length(pocket)) {
+if(length(pocket)>1) {
   pcs <- pcs.prepare(Gz[, pocket], Gy[, pocket])
 
   npcs <- min(which(pcs@vars > 0.8)[1], 6)
@@ -194,6 +195,6 @@ res <- data.frame(trait = colnames(z),
   min.snp.gwas = y.gwas$snp[which.min(y.gwas$p.value)])
 
 
-saveRDS(res, file = file.path("results/", m))
-message(sprintf("%s: done!", m))
+  saveRDS(res, file = file.path("results/", m))
+  message(sprintf("%s: done!", m))
 }

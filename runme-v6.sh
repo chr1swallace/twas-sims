@@ -28,8 +28,8 @@ for t in A ; do # AB
                 continue
             fi
             echo "$t :: $e1 :: $e2"
-	    qR.rb -r simq-v6.R --args rho=0.25 NSIM=100 N=$iN NSNP=500 e1=$e1 e2=$e2 t=$t
-	    qR.rb -r simq-v6.R --args rho=0 NSIM=100 N=$iN NSNP=500 e1=$e1 e2=$e2 t=$t
+	    qR.rb -r simq-v6.R --args rho=0.25 NSIM=400 N=$iN NSNP=500 e1=$e1 e2=$e2 t=$t
+	    qR.rb -r simq-v6.R --args rho=0 NSIM=400 N=$iN NSNP=500 e1=$e1 e2=$e2 t=$t
 	done
     done
 done
@@ -38,7 +38,10 @@ done
 
 ## should be 20000
 ## block size of 20 means 1000 runs
+echo simulations
 ruby -e 'print Dir.glob("/home/cew54/share/Projects/twas/sims/simv6*").count'
+echo results
+ruby -e 'print Dir.glob("/home/cew54/share/Projects/twas/sims/results/*").count'
 
 ## running time for one dataset = ~ 7 minutes with 2 runs of fuser 
 date

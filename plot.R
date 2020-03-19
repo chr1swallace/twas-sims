@@ -12,7 +12,7 @@ library(network)
 library(sna)
 library(ggnet)
 
-res <- readRDS(file = '~/share/Projects/twas/sim_results.rds')
+res <- readRDS(file = 'sim_results.rds')
 head(res)
 ## res[,ind.effect:=ifelse(effect!=0, "eqtl effect", "no effect")]
 ## res[,match:=ifelse(cv=="same","effects same","effects diff")]

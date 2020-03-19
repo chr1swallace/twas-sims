@@ -39,6 +39,6 @@ for(i in seq_along(files)) {
     ## res[[i]] <- copy(data)
 }
 res %<>% rbindlist(.,fill=TRUE)
-saveRDS(res, file = '/home/cew54/share/Projects/twas/sim_results.rds')
+saveRDS(res, file = '/home/cew54/D/sim_results.rds')
 
 
