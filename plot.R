@@ -12,7 +12,7 @@ library(network)
 library(sna)
 library(ggnet)
 
-res <- readRDS(file = '~/share/Projects/twas/sim_results-v5.rds')
+res <- readRDS(file = '~/share/Projects/twas/sim_results.rds')
 head(res)
 ## res[,ind.effect:=ifelse(effect!=0, "eqtl effect", "no effect")]
 ## res[,match:=ifelse(cv=="same","effects same","effects diff")]
@@ -31,6 +31,15 @@ res[,pname:=paste(t,e1,sub("-","",e4),sep=":")]
 ## background is whether E1 and E2-E5 match causal variants
 
 ## networks
+table(res$pname)
+
+unames <- table(res$pname)  %>% names()
+getn <- function(s) {
+  strsplit(s, ":")[[1]]  %>% nchar()  %>% max()
+}
+n <- sapply(unames, getn)
+singles <- unames[n==1]
+doubles <- unames[n==2]
 
 ## draw this:
 library(hrbrthemes)
@@ -90,8 +99,8 @@ e4rel <- makerel(unique(patterns$e4)  %>%  setdiff(.,""),to="E.back")
 ## plotter(1)
 ## glist <- lapply(1:nrow(patterns), plotter)
 
-  ## cook my own
-plotter <- function(i) {
+## cook my own
+for(i in 1:nrow(patterns)) {
   ti <- "No match"
   if(patterns$t[i]==patterns$e1[i]) {
     ti <- "Full match"
@@ -100,6 +109,10 @@ plotter <- function(i) {
                         strsplit(patterns$e1[i],"")[[1]])))
       ti <- "Partial match"
   }
+  patterns[i,match:=ti]
+}
+
+plotter <- function(i) {
   relations <- rbind(trel[[ patterns$t[i] ]],
                      e1rel[[ patterns$e1[[i]] ]],
                      e4rel[[ patterns$e4[[i]] ]])  %>% as.matrix()
@@ -113,46 +126,45 @@ plotter <- function(i) {
     xlim(0,5) + ylim(1.9,3.5) +
     scale_colour_manual(values=cscale) +
     scale_size_manual(values=c(GWAS=25,expression=25,v=10)) +
-    ggtitle(ti) +
+    ggtitle(patterns$match[i]) +
     theme(legend.position="none",axis.line=element_blank(),
           axis.title=element_blank(),
           axis.ticks=element_blank(), axis.text=element_blank())
 } 
 plotter(1)
 
-  glist <- lapply(1:nrow(patterns), plotter)
-    
+glist <- lapply(1:nrow(patterns), plotter)
+## plot_grid(plotlist=glist[ patterns$match=="No match" ])
+
+## plot_grid(plotlist=glist[patterns$pname %in% singles ])
+plot_grid(plotlist=glist[patterns$pname %in% doubles ])
+
 ## plot results by pattern
 res[,lasso.twas.all:=ifelse(is.na(lasso.twas),1,lasso.twas)]
 setnames(res,"lasso.twas","lasso.twas.tested")
-mvars <- grep("twas",names(res),value=TRUE)
-m <- melt(res[trait %in% c("E1")],
-          id.vars = c("trait","t","e1","e4","coloc.pval","pname"),
-          measure.vars=mvars)
-## m <- m[!is.na(value)]
-## m[!is.na(value),fdr:=p.adjust(value,method="BH"),by=c("variable","trait")]
-## m[is.na(value),value:=1]
-## m[is.na(fdr),fdr:=1]
-head(m)
 
 myCols <- viridis(option = "D", 4)
 
 ## equivalent:
 ## AB:A == AC:A
-m[pname=="AC:A",pname:="AB:A"]
 
-ggplot(res, aes(x=-log10(min.pval.expr), fill=!is.na(lasso.twas.tested))) +
-  geom_histogram(position="dodge") +
-  scale_fill_discrete("lasso run") +
-  facet_wrap(~e1)
+## ggplot(res, aes(x=-log10(min.pval.expr), fill=!is.na(lasso.twas.tested))) +
+##   geom_histogram(position="dodge") +
+##   scale_fill_discrete("lasso run") +
+##   ## facet_wrap(~e1)
+## facet_grid(rho ~ e1)
 
-  geom_violin() + facet_wrap(~pname) + theme(legend.position="none")
-
-ggplot(res, aes(x=is.na(lasso.twas), y=-log10(min.pval.expr), fill=is.na(lasso.twas))) +
-  geom_violin() + facet_wrap(~pname) + theme(legend.position="none")
-
-## summarised
-ms <- m[,list(avg=mean(value<0.05,na.rm=TRUE)),by=c("t","e1","e4","pname","variable")]
+## summarised, split by p
+NBREAKS <- 3 ## <-  set this to 1 to stop faceting by eqtl p value
+mvars <- grep("twas",names(res),value=TRUE)
+res[,coloc.rej:=coloc.pval<0.1]
+## levels(res$pbin) <- c("<10-8","<10-4","<1")
+m <- melt(res[trait %in% c("E1")],
+          id.vars = c("trait","t","e1","e4","coloc.pval","pname"),
+          measure.vars=mvars)
+head(m)
+ms <- m[,list(avg=mean(value<0.05,na.rm=TRUE), n=.N),
+        by=c("t","e1","e4","pname","variable")]
 ms[,variable:=sub(".twas","",variable)]
 nrow(ms)
 
@@ -160,17 +172,98 @@ plotbar <- function(p) {
   msub <- ms[pname==p]
   ggplot(msub) +
     geom_col(aes(x=variable,y=avg,fill=variable)) +
+    geom_text(aes(x=variable,label=n),y=1,data=msub[variable=="fuser"]) +
     geom_hline(yintercept=0.05) +
     ylim(0,max(ms$avg,na.rm=TRUE)) +
     background_grid(major="y") +
+    ## facet_grid(pbin~.) +
     theme(legend.position="none",axis.line=element_blank())
 }
 bars <- lapply(patterns$pname, plotbar)
 
-allplots <- lapply(1:nrow(patterns), function(i)
+plotboth <- function(nm) {
+allplots <- lapply(match(nm, patterns$pname), function(i)
   plot_grid(glist[[i]], bars[[i]],ncol=1,rel_heights=c(1,2)))
 plot_grid(plotlist=allplots)
-  
+}
+
+dput(singles)
+
+amatch <- c("A:A:", "A:A:B","A:A:A")
+ab <- c("A:B:",  "A:B:B","A:B:A" )
+discard <- c( "A:A:B","A:-:A","A:B:C",  "A:-:B")
+
+plotboth(c(amatch,ab))
+
+plotboth(doubles)
+
+### summarised
+NBREAKS <- 3 ## <-  set this to 1 to stop faceting by eqtl p value
+mvars <- grep("twas",names(res),value=TRUE)
+res[,pbin:=cut(min.pval.expr,breaks=c(1e-100,1e-8,1e-4,1),include.lowest=TRUE,dig.lab=1)]
+levels(res$pbin) <- c("<10-8","<10-4","<1")
+res[,rho:=as.factor(rho)]
+res[,coloc.rej:=coloc.pval<0.1]
+m <- melt(res[trait %in% c("E1")],
+          id.vars = c("trait","t","e1","e4","coloc.pval","pname","pbin","rho"),
+          measure.vars=mvars)
+head(m)
+ms <- m[,list(avg=mean(value<0.05,na.rm=TRUE), n=sum(!is.na(value))),
+        by=c("t","e1","e4","pname","variable","pbin","rho")]
+ms[,variable:=sub(".twas","",variable)]
+nrow(ms)
+
+
+plotbar <- function(p,byvar="pbin") {
+  msub <- ms[pname==p]
+  msub[is.nan(avg),avg:=0]
+  ggplot(msub) +
+    geom_col(aes(x=variable,y=avg,fill=variable),
+             data=msub[,.(avg=sum(avg*n)/sum(n)),by=c("variable",byvar)]) +
+    geom_text(aes(x=variable,label=n),y=1,
+              data=msub[variable=="fuser",.(n=sum(n)),by=c("variable",byvar)]) +
+    geom_hline(yintercept=0.05) +
+    ylim(0,max(ms$avg,na.rm=TRUE)) +
+    background_grid(major="y") +
+    facet_grid(as.formula(paste(byvar,"~.")),labeller=label_both) + #!!byvar ~ .) +
+    theme(legend.position="none",axis.line=element_blank())
+}
+bars.p <- lapply(patterns$pname, plotbar)
+bars.rho <- lapply(patterns$pname, plotbar, byvar="rho")
+
+## all.p <- lapply(1:nrow(patterns), function(i)
+##   plot_grid(glist[[i]], bars.p[[i]],ncol=1,rel_heights=c(1,2)))
+## plot_grid(plotlist=all.p[patterns$match=="No match"])
+
+all.rho <- lapply(1:nrow(patterns), function(i)
+  plot_grid(glist[[i]], bars.rho[[i]],ncol=1,rel_heights=c(1,2)))
+plot_grid(plotlist=all.rho[patterns$match=="No match"])
+patterns$pname[ patterns$match=="No match" ]
+## keep = A:-:A A:-:B / A:B: A:B:A
+plot_grid(plotlist=all.rho[patterns$match=="Full match"])
+patterns$pname[ patterns$match=="Full match" ]
+## keep = "A:A:"     "A:A:B"    "A:A:A"
+## similar to  "AB:AB:C"  "AB:AB:AB" "AB:AB:" 
+plot_grid(plotlist=all.rho[patterns$match=="Partial match"],nrow=2)
+patterns$pname[ patterns$match=="Partial match" ]
+
+## look at coloc p
+res[,coloc.fdr:=p.adjust(coloc.pval,method="BH")][,coloc.tdr:=1-coloc.fdr]
+ggplot(res,aes(x=coloc.pval,y=coloc.tdr)) + geom_point() + geom_smooth() +
+  background_grid()+
+  scale_x_continuous(breaks=seq(0,1,by=0.1)) +
+  facet_wrap(~pname)
+
+ggplot(res, aes(x=coloc.tdr)) +
+  geom_histogram(col="lightblue",binwidth=0.05) +
+  facet_wrap(~pname)
+
+h0=prop
+false discovery=declare non-prop when prop true
+fdr=P(prop true | declare non-prop)
+tdr=1-fdr=P(non-prop | declare non-prop)
+
+
 plotg <- function(g) {
   x <- as.data.frame(g)
   

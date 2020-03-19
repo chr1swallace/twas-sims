@@ -63,7 +63,7 @@ nr <- nrow(G)
 ## causal variants
 ABC=sample(1:ncol(G), 4); names(ABC) <- c("A","B","C", "-")
 ## effects at those variants, expression
-beta <- replicate(3,amax(rnorm(10,0,0.15)))   %>% c(., 0) # beta_A, beta_B, beta_C
+beta <- replicate(10,amax(rnorm(10,0,0.2)))   %>% c(., 0) # beta_A, beta_B, beta_C
 names(beta) <- names(ABC)
     
 ## outcomes - trait
@@ -84,6 +84,8 @@ if(args$e2=="-")
 cv <- ABC["-"]
 if(args$e2=="diff")
 cv <- ABC[ setdiff(names(ABC), unlist(strsplit(c(args$t,args$e1),""))) ]
+  if(args$e2=="t")
+    cv <- ABC[ unlist(strsplit(args$t,"")) ]
 z4 <- replicate(4,rnorm(args$N) + G2[,cv,drop=FALSE] %*% b4[names(cv)], simplify=FALSE)   %>% do.call("cbind",.)
 z <- cbind(z1,z4)
 LD <- cor(G[,ABC]); dimnames(LD) <- list(names(ABC),names(ABC))
@@ -96,17 +98,17 @@ beta=beta,b4=b4,LD=LD,ABC=ABC)),
 } 
 
 for(i in 1:args$NSIM) {
-x <- NULL
-while(is.null(x))
+  x <- NULL
+  while(is.null(x))
     x=simone()
     ## dir.create("~/share/Projects/twas/sims",recursive=TRUE)
     ## dir.create("~/scratch/Projects/twas/sims",recursive=TRUE)
 
-    tmp <- tempfile(pattern="simv4","~/share/Projects/twas/sims",fileext=".rds")
-    key <- sub("sims","keys",tmp)
+  tmp <- tempfile(pattern="simv4","~/share/Projects/twas/sims",fileext=".rds")
+  key <- sub("sims","keys",tmp)
     
-    saveRDS(x$data, file=tmp, version=2)
-    saveRDS(x$key, file=key, version=2)
+  saveRDS(x$data, file=tmp, version=2)
+  saveRDS(x$key, file=key, version=2)
 }
 
 

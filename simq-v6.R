@@ -7,8 +7,8 @@ devtools::load_all("~/RP/coloc")
 args <- getArgs(defaults=list(N=400,NSIM=2,NSNP=500,ld="highld",pop="eur",
 e1="A", # A, AB, -
 e2="same", # same, weaker, diff, -
-t="A"), # A, AB, BA, AC, C
-                numeric=c("N","NSIM","NCV"))
+t="A",rho=0), # A, AB, BA, AC, C
+                numeric=c("N","NSIM","NCV","rho"))
 print(args)
 
 ## hdata <- readRDS(paste0("~/scratch/",args$ld,".RDS"))
@@ -48,6 +48,8 @@ amax <- function(x) {
     x[which.max(abs(x))]
 }
 
+library(mvtnorm)
+
 simone <- function() {
   ## make genotypes
   G <- GG[[sample(1:length(GG),1)]] # sample one genotype scenario
@@ -84,7 +86,10 @@ simone <- function() {
     
   ## outcomes - expr 
   cv <- ABC[ unlist(strsplit(args$e1,"")) ]
-  z1  <-  rnorm(args$N) + G2[,cv,drop=FALSE] %*% beta[names(cv)]
+  S <- matrix(args$rho,5,5)
+  diag(S) <- 1
+  Z <- rmvnorm(args$N,sigma=S)
+  z1  <-  Z[,1] + G2[,cv,drop=FALSE] %*% beta[names(cv)]
   p1 <- single.snp.tests(z1,snp.data=X2)  %>% chi.squared(.,1)  %>% pchisq(.,df=1,lower=FALSE)
 
   ## outcomes - expr background
@@ -98,7 +103,8 @@ simone <- function() {
   }
   if(args$e2=="t")
     cv <- ABC[ unlist(strsplit(args$t,"")) ]
-  z4 <- replicate(4,rnorm(args$N) + G2[,cv,drop=FALSE] %*% b4[names(cv)], simplify=FALSE)   %>% do.call("cbind",.)
+  z4 <- Z[,-1] + matrix(G2[,cv,drop=FALSE] %*% b4[names(cv)],nrow=args$N,ncol=ncol(Z)-1)
+e4 <- cv # store
   p2 <- single.snp.tests(z4[,1],snp.data=X2)  %>% chi.squared(.,1)  %>% pchisq(.,df=1,lower=FALSE)
   p3 <- single.snp.tests(z4[,2],snp.data=X2)  %>% chi.squared(.,1)  %>% pchisq(.,df=1,lower=FALSE)
   p4 <- single.snp.tests(z4[,3],snp.data=X2)  %>% chi.squared(.,1)  %>% pchisq(.,df=1,lower=FALSE)
@@ -126,7 +132,7 @@ simone <- function() {
   } else {
     pocket <- numeric(0)
   }
-  return(list(key=c(args, list(e4=paste(names(cv),collapse=""),
+  return(list(key=c(args, list(e4=paste(names(e4),collapse=""),
                                beta=beta,b4=b4,LD=LD,ABC=ABC,minp=minp)),
                 data=list(y=y,Gy=X1,z=z,Gy=X2,pocket=pocket)))
 } 
