@@ -38,7 +38,7 @@ do.gwas <- function(y, geno, stratum = NULL, cc = FALSE) {
 FF <- list.files(pattern = "simv6")
 ## FF <- FF[!(FF %in% err$file)]
 files.done <- list.files("results")
-files.todo <- setdiff(FF, files.done)[ (taskid * BATCH.SIZE + 1):((taskid+1)*BATCH.SIZE) ]   
+files.todo <- setdiff(sample(FF), files.done)[ (taskid * BATCH.SIZE + 1):((taskid+1)*BATCH.SIZE) ]   
 message("running ",length(files.todo)," files.")
 
 for(m in sample(files.todo)) {

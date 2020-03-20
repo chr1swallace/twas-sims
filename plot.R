@@ -32,6 +32,9 @@ res[,pname:=paste(t,e1,sub("-","",e4),sep=":")]
 
 ## networks
 table(res$pname)
+res[,fuser.twas:=NULL] # not centered
+res[,mtl.twas:=NULL] # not centered
+setnames(res, c("mtl2.twas","fuser2.twas"), c("mtl.twas","fuser.twas"))
 
 unames <- table(res$pname)  %>% names()
 getn <- function(s) {
@@ -44,11 +47,13 @@ doubles <- unames[n==2]
 ## draw this:
 library(hrbrthemes)
 cols <- ipsum_pal()(9)  %>% c(.,"#aaaaaa","#ffffff")
+myCols <- viridis(option = "D", 4)
+myCols <- SEABORN_PALETTES$pastel[c(7,8,6)]
 library(igraph)
 patterns <- unique(res[,.(t,e1=sub("-","",e1),e4=sub("-","",e4),pname)])
 nodes <- data.table(name=c("GWAS","A","B","C","D","E.test","E.back"),
                     class=c("GWAS","v","v","v","v","expression","expression"),
-                    col=cols[c(2,10,10,10,10,2,4)],
+                    col=myCols[c(1,2,2,2,2,1,3)], #cols[c(2,10,10,10,10,2,4)],
                     x=c(1.5,1,2,3,4,3.5,2.5),
                     y=c(3,2,2,2,2,3,3),
                     stringsAsFactors=FALSE)
@@ -96,7 +101,7 @@ e4rel <- makerel(unique(patterns$e4)  %>%  setdiff(.,""),to="E.back")
 ##          shape=15) +
 ##     theme(axis.line=element_blank())
 ## }
-## plotter(1)
+plotter(1)
 ## glist <- lapply(1:nrow(patterns), plotter)
 
 ## cook my own
@@ -131,19 +136,18 @@ plotter <- function(i) {
           axis.title=element_blank(),
           axis.ticks=element_blank(), axis.text=element_blank())
 } 
-plotter(1)
+## plotter(1)
 
 glist <- lapply(1:nrow(patterns), plotter)
 ## plot_grid(plotlist=glist[ patterns$match=="No match" ])
 
 ## plot_grid(plotlist=glist[patterns$pname %in% singles ])
-plot_grid(plotlist=glist[patterns$pname %in% doubles ])
+## plot_grid(plotlist=glist[patterns$pname %in% doubles ])
 
 ## plot results by pattern
-res[,lasso.twas.all:=ifelse(is.na(lasso.twas),1,lasso.twas)]
-setnames(res,"lasso.twas","lasso.twas.tested")
-
-myCols <- viridis(option = "D", 4)
+res[,lasso.twas:=ifelse(is.na(lasso.twas),1,lasso.twas)]
+## res[,lasso.twas.all:=ifelse(is.na(lasso.twas),1,lasso.twas)]
+## setnames(res,"lasso.twas","lasso.twas.tested")
 
 ## equivalent:
 ## AB:A == AC:A
@@ -163,23 +167,48 @@ m <- melt(res[trait %in% c("E1")],
           id.vars = c("trait","t","e1","e4","coloc.pval","pname"),
           measure.vars=mvars)
 head(m)
-ms <- m[,list(avg=mean(value<0.05,na.rm=TRUE), n=.N),
+table(m$variable)
+
+table(m$variable,is.na(m$value))
+## m[variable!="lasso.twas.tested" & is.na(value), value:=1]
+m[is.na(value), value:=1]
+m[!is.na(value) & pname %in% singles,fdr:=p.adjust(value),by=c("variable")]
+ms <- m[,list(p.05=mean(value<0.05,na.rm=TRUE),
+              fdr.05=mean(fdr<0.05,na.rm=TRUE),
+              n=sum(!is.na(value))),
         by=c("t","e1","e4","pname","variable")]
 ms[,variable:=sub(".twas","",variable)]
 nrow(ms)
+table(ms$n,ms$variable)
+ms
 
-plotbar <- function(p) {
+source("seaborn_pal.R")
+plotbar <- function(p,what=c("p","fdr")) {
+  what <- match.arg(what)
   msub <- ms[pname==p]
-  ggplot(msub) +
-    geom_col(aes(x=variable,y=avg,fill=variable)) +
-    geom_text(aes(x=variable,label=n),y=1,data=msub[variable=="fuser"]) +
+  msub <- melt(msub,measure.vars=c("p.05","fdr.05"),variable.name="pfdr")
+  p <- ggplot(msub) +
+    geom_col(aes(x=variable,y=value,fill=variable))  +
+    facet_grid(pfdr~.)
+  ## if(what=="p") 
+  ##   p <- p + geom_col(aes(x=variable,y=avg,fill=variable))  
+  ##     ## labs(y="p < 0.05")
+  ## if(what=="fdr")
+  ##   p <- p + geom_col(aes(x=variable,y=favg,fill=variable))
+  ##     ## ylab("FDR < 0.05")
+  p <- p +  
+    geom_text(aes(x=variable,label=n),y=1) + #,data=msub[variable %in% c("fuser","lasso.tested")]) +
     geom_hline(yintercept=0.05) +
-    ylim(0,max(ms$avg,na.rm=TRUE)) +
+    ylim(0,1) +
     background_grid(major="y") +
-    ## facet_grid(pbin~.) +
-    theme(legend.position="none",axis.line=element_blank())
+    scale_fill_manual(values=SEABORN_PALETTES$muted[1:4]) +
+  ## facet_grid(pbin~.) +
+    theme(legend.position="none",
+          axis.line=element_blank(),
+          axis.text.x=element_text(angle=90,hjust=1,vjust=0))
 }
 bars <- lapply(patterns$pname, plotbar)
+## fbars <- lapply(patterns$pname, plotbar, what="fdr")
 
 plotboth <- function(nm) {
 allplots <- lapply(match(nm, patterns$pname), function(i)
@@ -195,7 +224,7 @@ discard <- c( "A:A:B","A:-:A","A:B:C",  "A:-:B")
 
 plotboth(c(amatch,ab))
 
-plotboth(doubles)
+## plotboth(doubles)
 
 ### summarised
 NBREAKS <- 3 ## <-  set this to 1 to stop faceting by eqtl p value
@@ -229,7 +258,7 @@ plotbar <- function(p,byvar="pbin") {
     theme(legend.position="none",axis.line=element_blank())
 }
 bars.p <- lapply(patterns$pname, plotbar)
-bars.rho <- lapply(patterns$pname, plotbar, byvar="rho")
+## bars.rho <- lapply(patterns$pname, plotbar, byvar="rho")
 
 ## all.p <- lapply(1:nrow(patterns), function(i)
 ##   plot_grid(glist[[i]], bars.p[[i]],ncol=1,rel_heights=c(1,2)))
