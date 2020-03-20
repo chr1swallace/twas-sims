@@ -54,9 +54,9 @@ patterns <- unique(res[,.(t,e1=sub("-","",e1),e4=sub("-","",e4),pname)])
 nodes <- data.table(name=c("GWAS","A","B","C","D","E.test","E.back"),
                     class=c("GWAS","v","v","v","v","expression","expression"),
                     col=myCols[c(1,2,2,2,2,1,3)], #cols[c(2,10,10,10,10,2,4)],
-                    x=c(1.5,1,2,3,4,3.5,2.5),
+                    x=c(0.5,1,2,3,4,2.5,1.5),
                     y=c(3,2,2,2,2,3,3),
-                    stringsAsFactors=FALSE)
+                    stringsAsFactors=FALSE)[-c(4,5)] # don't use C, D nodes
 layout <- matrix(c(nodes$x,nodes$y),ncol=2,dimnames=list(nodes$name,c("x","y")))
 makerel <- function(p,to) {
   rels <- lapply(p, function(x)
@@ -128,7 +128,7 @@ plotter <- function(i) {
     geom_segment(aes(x=x.from,y=y.from,xend=x.to,yend=y.to,col=col),data=rdf,size=1) +
     geom_point(aes(colour=col,size=class),pch=20) +
     geom_text(aes(label=name)) +
-    xlim(0,5) + ylim(1.9,3.5) +
+    xlim(0,3) + ylim(1.9,3.5) +
     scale_colour_manual(values=cscale) +
     scale_size_manual(values=c(GWAS=25,expression=25,v=10)) +
     ggtitle(patterns$match[i]) +
@@ -172,7 +172,7 @@ table(m$variable)
 table(m$variable,is.na(m$value))
 ## m[variable!="lasso.twas.tested" & is.na(value), value:=1]
 m[is.na(value), value:=1]
-m[!is.na(value) & pname %in% singles,fdr:=p.adjust(value),by=c("variable")]
+m[!is.na(value) & pname %in% singles,fdr:=p.adjust(value,method="BH"),by=c("variable")]
 ms <- m[,list(p.05=mean(value<0.05,na.rm=TRUE),
               fdr.05=mean(fdr<0.05,na.rm=TRUE),
               n=sum(!is.na(value))),
@@ -197,8 +197,9 @@ plotbar <- function(p,what=c("p","fdr")) {
   ##   p <- p + geom_col(aes(x=variable,y=favg,fill=variable))
   ##     ## ylab("FDR < 0.05")
   p <- p +  
-    geom_text(aes(x=variable,label=n),y=1) + #,data=msub[variable %in% c("fuser","lasso.tested")]) +
+    ## geom_text(aes(x=variable,label=n),y=1) + #,data=msub[variable %in% c("fuser","lasso.tested")]) +
     geom_hline(yintercept=0.05) +
+    labs(x="Method",y="Proportion") + 
     ylim(0,1) +
     background_grid(major="y") +
     scale_fill_manual(values=SEABORN_PALETTES$muted[1:4]) +
@@ -217,12 +218,12 @@ plot_grid(plotlist=allplots)
 }
 
 dput(singles)
-
 amatch <- c("A:A:", "A:A:B","A:A:A")
 ab <- c("A:B:",  "A:B:B","A:B:A" )
 discard <- c( "A:A:B","A:-:A","A:B:C",  "A:-:B")
 
 plotboth(c(amatch,ab))
+ggsave("sims.png",height=6,width=8,scale=1.5)
 
 ## plotboth(doubles)
 
