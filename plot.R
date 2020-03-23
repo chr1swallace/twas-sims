@@ -43,6 +43,17 @@ getn <- function(s) {
 n <- sapply(unames, getn)
 singles <- unames[n==1]
 doubles <- unames[n==2]
+dput(singles)
+amatch <- c("A:A:", "A:A:B","A:A:A")
+ab <- c("A:B:",  "A:B:B","A:B:A" )
+discard <- c( "A:A:B","A:-:A","A:B:C",  "A:-:B")
+
+
+getm <- function(s) {
+  ss <- strsplit(s, ":")[[1]]
+  ss[[1]]==ss[[2]]
+}
+matches <- sapply(unames, getm)
 
 ## draw this:
 library(hrbrthemes)
@@ -145,7 +156,7 @@ glist <- lapply(1:nrow(patterns), plotter)
 ## plot_grid(plotlist=glist[patterns$pname %in% doubles ])
 
 ## plot results by pattern
-res[,lasso.twas:=ifelse(is.na(lasso.twas),1,lasso.twas)]
+## res[,lasso.twas:=ifelse(is.na(lasso.twas),1,lasso.twas)]
 ## res[,lasso.twas.all:=ifelse(is.na(lasso.twas),1,lasso.twas)]
 ## setnames(res,"lasso.twas","lasso.twas.tested")
 
@@ -171,25 +182,43 @@ table(m$variable)
 
 table(m$variable,is.na(m$value))
 ## m[variable!="lasso.twas.tested" & is.na(value), value:=1]
-m[is.na(value), value:=1]
-m[!is.na(value) & pname %in% singles,fdr:=p.adjust(value,method="BH"),by=c("variable")]
-ms <- m[,list(p.05=mean(value<0.05,na.rm=TRUE),
-              fdr.05=mean(fdr<0.05,na.rm=TRUE),
+## m[is.na(value), value:=1]
+## m[,n:=1:.N,by=c("pname","variable")]
+m[,fdr:=NULL]
+
+## what happens with associated hits only 2% of total?
+table(m$variable)
+m[,keep1:=sample(which(value < 0.05), 40),,by=c("variable")]
+## null <- m[ pname %in% ab ][,fake:=TRUE]
+## mtmp <- rbind(m, null, null, null, null, fill=TRUE)
+## mtmp[,fdrl:=p.adjust(value,method="BH"),by=c("variable")]
+## m <- mtmp[is.na(fake)]
+
+
+m[#pname %in% singles,
+ !is.na(value),fdr:=p.adjust(value,method="BH"),by=c("variable")]
+ms <- m[,list(p.05=sum(value<0.05,na.rm=TRUE)/.N,
+             p.01=sum(value<0.01,na.rm=TRUE)/.N,
+               fdr.05=sum(fdr<0.05,na.rm=TRUE)/.N,
+              ## fdrl.05=sum(fdrl<0.05,na.rm=TRUE)/.N,
               n=sum(!is.na(value))),
         by=c("t","e1","e4","pname","variable")]
 ms[,variable:=sub(".twas","",variable)]
 nrow(ms)
 table(ms$n,ms$variable)
-ms
+ms[pname %in% singles & variable=="lasso"]
+ms[pname %in% singles & variable=="rf"]
+
+## ggplot(m[pname %in% singles],aes(x=value,y=fdr,col=variable)) + geom_point() + facet_wrap( ~ pname)
 
 source("seaborn_pal.R")
 plotbar <- function(p,what=c("p","fdr")) {
   what <- match.arg(what)
   msub <- ms[pname==p]
-  msub <- melt(msub,measure.vars=c("p.05","fdr.05"),variable.name="pfdr")
+  ## msub <- melt(msub,measure.vars=c("p.05","fdr.05"),variable.name="pfdr")
   p <- ggplot(msub) +
-    geom_col(aes(x=variable,y=value,fill=variable))  +
-    facet_grid(pfdr~.)
+    geom_col(aes(x=variable,y=p.05,fill=variable)) #+ 
+    ## facet_grid(pfdr~.)
   ## if(what=="p") 
   ##   p <- p + geom_col(aes(x=variable,y=avg,fill=variable))  
   ##     ## labs(y="p < 0.05")
@@ -202,7 +231,7 @@ plotbar <- function(p,what=c("p","fdr")) {
     labs(x="Method",y="Proportion") + 
     ylim(0,1) +
     background_grid(major="y") +
-    scale_fill_manual(values=SEABORN_PALETTES$muted[1:4]) +
+    scale_fill_manual(values=SEABORN_PALETTES$muted[c(3,1,4,2)]) +
   ## facet_grid(pbin~.) +
     theme(legend.position="none",
           axis.line=element_blank(),
@@ -217,15 +246,22 @@ allplots <- lapply(match(nm, patterns$pname), function(i)
 plot_grid(plotlist=allplots)
 }
 
-dput(singles)
-amatch <- c("A:A:", "A:A:B","A:A:A")
-ab <- c("A:B:",  "A:B:B","A:B:A" )
-discard <- c( "A:A:B","A:-:A","A:B:C",  "A:-:B")
-
 plotboth(c(amatch,ab))
 ggsave("sims.png",height=6,width=8,scale=1.5)
 
-## plotboth(doubles)
+plotboth(doubles)
+
+## where does lasso > rf?
+res[,lasso2:=ifelse(is.na(lasso.twas), 1, lasso.twas)]
+with(res, table(pname, lasso2 < rf.twas))
+with(res[pname=="AB:AB:"], table(rho, lasso2 < rf.twas))
+ggplot(res, aes(x=-log10(rf.twas),y=lasso
+
+## false positive rates
+ms[ pname=="A:B:A" ]
+
+
+plotboth(doubles[matches])
 
 ### summarised
 NBREAKS <- 3 ## <-  set this to 1 to stop faceting by eqtl p value

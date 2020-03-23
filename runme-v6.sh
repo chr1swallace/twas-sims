@@ -55,3 +55,16 @@ qR.rb -r collate-v6.R
 
 ## plot
 Rscript plot.R
+
+################################################################################
+
+## sim just one expression trait to compare fdr with rd and lasso
+
+iN=500
+for t in A ; do # AB
+    for e1 in A B - ; do # - BA AB AC 
+	qR.rb  -r -y 0-99 simone-v6.R --args rho=0 NSIM=400 N=$iN NSNP=500 e1=$e1 t=$t
+    done
+done
+
+Rscript collateone-v6.R

@@ -9,6 +9,7 @@ source("fuser_hack_nfg.R")
 source("Code_util.R")
 library(magrittr)
 library(parallel)
+source("~/D/common.R")
 
 BATCH.SIZE <- 20 # how many files to process per go
 taskid <- 0
@@ -22,19 +23,6 @@ if("taskid" %in% names(args))
   
 
 setwd("/home/cew54/share/Projects/twas/sims")
-do.gwas <- function(y, geno, stratum = NULL, cc = FALSE) {
-  res <- lapply(1 : ncol(geno), FUN = function(j) {
-    ## message(colnames(geno)[j])
-    m <- lm(y ~ geno[, j])
-   summ <- summary(m) 
-    data.frame(snp = colnames(geno)[j],
-               beta = summ$coefficients[2, "Estimate"],
-               var.beta = summ$coefficients[2, "Std. Error"]^2,
-               p.value = summ$coefficients[2, "Pr(>|t|)"])
-  })
-  do.call(rbind, res)
-}
-
 FF <- list.files(pattern = "simv6")
 ## FF <- FF[!(FF %in% err$file)]
 files.done <- list.files("results")
