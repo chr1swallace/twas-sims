@@ -10,7 +10,8 @@ library(cowplot); theme_set(theme_cowplot())
 ## devtools::load_all("~/RP/coloc")
 library(network)
 library(sna)
-library(ggnet)
+## library(ggnet)
+source("~/D/seaborn_pal.R")
 
 res <- readRDS(file = 'sim_results.rds')
 head(res)
@@ -112,7 +113,7 @@ e4rel <- makerel(unique(patterns$e4)  %>%  setdiff(.,""),to="E.back")
 ##          shape=15) +
 ##     theme(axis.line=element_blank())
 ## }
-plotter(1)
+## plotter(1)
 ## glist <- lapply(1:nrow(patterns), plotter)
 
 ## cook my own
@@ -188,7 +189,7 @@ m[,fdr:=NULL]
 
 ## what happens with associated hits only 2% of total?
 table(m$variable)
-m[,keep1:=sample(which(value < 0.05), 40),,by=c("variable")]
+## m[,keep1:=sample(which(value < 0.05), 40),,by=c("variable")]
 ## null <- m[ pname %in% ab ][,fake:=TRUE]
 ## mtmp <- rbind(m, null, null, null, null, fill=TRUE)
 ## mtmp[,fdrl:=p.adjust(value,method="BH"),by=c("variable")]
@@ -198,16 +199,28 @@ m[,keep1:=sample(which(value < 0.05), 40),,by=c("variable")]
 m[#pname %in% singles,
  !is.na(value),fdr:=p.adjust(value,method="BH"),by=c("variable")]
 ms <- m[,list(p.05=sum(value<0.05,na.rm=TRUE)/.N,
-             p.01=sum(value<0.01,na.rm=TRUE)/.N,
-               fdr.05=sum(fdr<0.05,na.rm=TRUE)/.N,
+              p.01=sum(value<0.01,na.rm=TRUE)/.N,
+              fdr.05=sum(fdr<0.05,na.rm=TRUE)/.N,
               ## fdrl.05=sum(fdrl<0.05,na.rm=TRUE)/.N,
               n=sum(!is.na(value))),
         by=c("t","e1","e4","pname","variable")]
 ms[,variable:=sub(".twas","",variable)]
-nrow(ms)
+m[,coloc.filter:=coloc.pval< 0.05 & !is.na(coloc.pval)]
+m[,N:=.N, by=c("t","e1","e4","pname","variable")]
+msc <- m[,list(p.05=sum(value<0.05,na.rm=TRUE)/unique(N),
+               p.01=sum(value<0.01,na.rm=TRUE)/unique(N),
+               fdr.05=sum(fdr<0.05,na.rm=TRUE)/unique(N),
+              ## fdrl.05=sum(fdrl<0.05,na.rm=TRUE)/.N,
+               n=sum(!is.na(value))),
+         by=c("t","e1","e4","pname","variable","coloc.filter")]
+ms[,variable:=sub(".twas","",variable)]
+msc[,variable:=sub(".twas","",variable)]
+msc[,coloc.filter:=factor(coloc.filter,levels=c("TRUE","FALSE"))]
+  nrow(ms)
 table(ms$n,ms$variable)
 ms[pname %in% singles & variable=="lasso"]
 ms[pname %in% singles & variable=="rf"]
+msc[pname %in% singles & variable=="rf"]
 
 ## ggplot(m[pname %in% singles],aes(x=value,y=fdr,col=variable)) + geom_point() + facet_wrap( ~ pname)
 
@@ -239,6 +252,30 @@ plotbar <- function(p,what=c("p","fdr")) {
 }
 bars <- lapply(patterns$pname, plotbar)
 ## fbars <- lapply(patterns$pname, plotbar, what="fdr")
+
+##' stratify by coloc pval < 0.05
+plotbarc <- function(p,what=c("p","fdr")) {
+  what <- match.arg(what)
+  msub <- msc[pname==p]
+  ## msub <- melt(msub,measure.vars=c("p.05","fdr.05"),variable.name="pfdr")
+  plt <- ggplot(msub) +
+    geom_col(aes(x=variable,y=p.05,fill=variable,alpha=coloc.filter),position="stack") #+ 
+  plt +  
+    ## geom_text(aes(x=variable,label=n),y=1) + #,data=msub[variable %in% c("fuser","lasso.tested")]) +
+    geom_hline(yintercept=0.05) +
+    labs(x="Method",y="Proportion") + 
+    ylim(0,1) +
+    background_grid(major="y") +
+    scale_fill_manual(values=SEABORN_PALETTES$muted[c(3,1,4,2)]) +
+    scale_alpha_manual(values=c("TRUE"=0.5,"FALSE"=0.9)) +
+  ## facet_grid(pbin~.) +
+    theme(legend.position="none",
+          axis.line=element_blank(),
+          axis.text.x=element_text(angle=90,hjust=1,vjust=0))
+}
+bars <- lapply(patterns$pname, plotbarc)
+## fbars <- lapply(patterns$pname, plotbar, what="fdr")
+bars[[1]]
 
 plotboth <- function(nm) {
 allplots <- lapply(match(nm, patterns$pname), function(i)
