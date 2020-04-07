@@ -269,10 +269,10 @@ plotbarc <- function(p,what=c("p","fdr")) {
   msub <- msc[pname==p]
   ## msub <- melt(msub,measure.vars=c("p.05","fdr.05"),variable.name="pfdr")
   plt <- ggplot(msub) +
-    geom_col(aes(x=variable,y=p.05,fill=variable,alpha=coloc.filter),position="stack") #+ 
+    geom_col(aes(x=variable,y=p.05,fill=variable,alpha=coloc.filter),col="grey",position="stack") #+ 
   plt +  
     ## geom_text(aes(x=variable,label=n),y=1) + #,data=msub[variable %in% c("fuser","lasso.tested")]) +
-    geom_hline(yintercept=0.05) +
+    geom_hline(yintercept=0.05,linetype="dashed") +
     labs(x="Method",y="Proportion") + 
     ylim(0,1) +
     background_grid(major="y") +
@@ -320,6 +320,12 @@ ggplot(res, aes(x=-log10(rf.twas),y=lasso
 ms[ pname=="A:B:A" ]
 msc[ pname=="A:B:A" ]
 
+## filtering by coloc
+t1 <- msc[ pname %in% singles & grepl("^A:A",pname) & coloc.filter==TRUE ,.(mean(p.05)),by=c("pname","variable")]
+t2 <- msc[ pname %in% singles & grepl("^A:A",pname) & coloc.filter==FALSE ,.(mean(p.05)),by=c("pname","variable")]
+t3 <- merge(t1,t2,by=c("pname","variable"),suffixes=c(".drop",".keep"))
+t3[,pc:=V1.drop/(V1.keep + V1.drop)]
+t3
 
 plotboth(doubles[matches])
 
