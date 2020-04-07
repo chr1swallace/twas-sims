@@ -59,13 +59,12 @@ matches <- sapply(unames, getm)
 ## draw this:
 library(hrbrthemes)
 cols <- ipsum_pal()(9)  %>% c(.,"#aaaaaa","#ffffff")
-myCols <- viridis(option = "D", 4)
-myCols <- SEABORN_PALETTES$pastel[c(7,8,6)]
+simCols <- SEABORN_PALETTES$pastel[c(4,8,6)]
 library(igraph)
 patterns <- unique(res[,.(t,e1=sub("-","",e1),e4=sub("-","",e4),pname)])
 nodes <- data.table(name=c("GWAS","A","B","C","D","E.test","E.back"),
                     class=c("GWAS","v","v","v","v","expression","expression"),
-                    col=myCols[c(1,2,2,2,2,1,3)], #cols[c(2,10,10,10,10,2,4)],
+                    col=simCols[c(1,2,2,2,2,1,3)], #cols[c(2,10,10,10,10,2,4)],
                     x=c(0.5,1,2,3,4,2.5,1.5),
                     y=c(3,2,2,2,2,3,3),
                     stringsAsFactors=FALSE)[-c(4,5)] # don't use C, D nodes
@@ -222,6 +221,16 @@ ms[pname %in% singles & variable=="lasso"]
 ms[pname %in% singles & variable=="rf"]
 msc[pname %in% singles & variable=="rf"]
 
+  ms[variable=="lasso",variable:="Lasso"]
+  ms[variable=="fuser",variable:="Joint lasso"]
+  ms[variable=="rf",variable:="RF"]
+  ms[variable=="mtl",variable:="RF-MTL"]
+  ms[,variable:=factor(as.character(variable), levels=c("Lasso","RF","Joint lasso","RF-MTL"))]
+  msc[variable=="lasso",variable:="Lasso"]
+  msc[variable=="fuser",variable:="Joint lasso"]
+  msc[variable=="rf",variable:="RF"]
+  msc[variable=="mtl",variable:="RF-MTL"]
+  msc[,variable:=factor(as.character(variable), levels=c("Lasso","RF","Joint lasso","RF-MTL"))]
 ## ggplot(m[pname %in% singles],aes(x=value,y=fdr,col=variable)) + geom_point() + facet_wrap( ~ pname)
 
 source("seaborn_pal.R")
@@ -244,7 +253,8 @@ plotbar <- function(p,what=c("p","fdr")) {
     labs(x="Method",y="Proportion") + 
     ylim(0,1) +
     background_grid(major="y") +
-    scale_fill_manual(values=SEABORN_PALETTES$muted[c(3,1,4,2)]) +
+    ## scale_fill_manual(values=SEABORN_PALETTES$muted[c(3,1,4,2)]) +
+    scale_fill_manual(values=myCol) +
   ## facet_grid(pbin~.) +
     theme(legend.position="none",
           axis.line=element_blank(),
@@ -266,7 +276,8 @@ plotbarc <- function(p,what=c("p","fdr")) {
     labs(x="Method",y="Proportion") + 
     ylim(0,1) +
     background_grid(major="y") +
-    scale_fill_manual(values=SEABORN_PALETTES$muted[c(3,1,4,2)]) +
+    ## scale_fill_manual(values=SEABORN_PALETTES$muted[c(3,1,4,2)]) +
+    scale_fill_manual(values=myCol) +
     scale_alpha_manual(values=c("TRUE"=0.5,"FALSE"=0.9)) +
   ## facet_grid(pbin~.) +
     theme(legend.position="none",
@@ -277,13 +288,24 @@ bars <- lapply(patterns$pname, plotbarc)
 ## fbars <- lapply(patterns$pname, plotbar, what="fdr")
 bars[[1]]
 
-plotboth <- function(nm) {
-allplots <- lapply(match(nm, patterns$pname), function(i)
-  plot_grid(glist[[i]], bars[[i]],ncol=1,rel_heights=c(1,2)))
-plot_grid(plotlist=allplots)
+plotboth <- function(nm,rm=3) {
+  bars2 <- bars
+  if(rm>0) {
+    todel <- match(nm, patterns$pname)[1:rm]
+    bars2[todel]  %<>% lapply(., function(p)
+      p + theme(axis.text.x=element_blank(),
+                axis.ticks.x=element_blank(),
+                axis.title.x=element_blank())
+      )
+  }
+  allplots <- lapply(match(nm, patterns$pname), function(i)
+    plot_grid(glist[[i]], bars2[[i]],ncol=1,rel_heights=c(1,2)))
+  ## remove row labs from top row
+  plot_grid(plotlist=allplots,rel_heights=c(1,1.1))
 }
 
 plotboth(c(amatch,ab))
+
 ggsave("sims.png",height=6,width=8,scale=1.5)
 
 plotboth(doubles)
@@ -296,6 +318,7 @@ ggplot(res, aes(x=-log10(rf.twas),y=lasso
 
 ## false positive rates
 ms[ pname=="A:B:A" ]
+msc[ pname=="A:B:A" ]
 
 
 plotboth(doubles[matches])
@@ -389,7 +412,7 @@ ggplot(ms[],aes(x=fdr_bin,y=avg,fill=variable)) +
   geom_col(position="dodge") +
   ## facet_grid(match~background,labeller=label_both, scales="free") +
   facet_wrap(~pname,scales="free") +
-  scale_fill_manual(values = myCols) +
+  scale_fill_manual(values = simCols) +
     ggtitle("twas FDR")
 
 
@@ -398,7 +421,7 @@ ggplot(m[],aes(x=fdr,fill=variable)) +
   geom_histogram(aes(y = ..density..), position="dodge",binwidth=0.1,center=0.05) +
   ## facet_grid(match~background,labeller=label_both, scales="free") +
   facet_wrap(~pname,scales="free") +
-  scale_fill_manual(values = myCols) +
+  scale_fill_manual(values = simCols) +
   ggtitle("twas FDR")
 
 #STANDARD plot
@@ -406,7 +429,7 @@ ggplot(m[],aes(x=fdr,fill=variable)) +
     geom_histogram(position="dodge",binwidth=0.1,center=0.05) +
   ## facet_grid(match~background,labeller=label_both, scales="free") +
   facet_wrap(~pname,scales="free") +
-  scale_fill_manual(values = myCols) +
+  scale_fill_manual(values = simCols) +
     ggtitle("twas FDR")
 
 
@@ -458,17 +481,17 @@ tt
 m[,keep:=TRUE]
 
 #--------------------->>>>>>PLOTS<<<<<<--------------------------------
-myCols <- viridis(option = "D", 4)
+simCols <- viridis(option = "D", 4)
 #DENSITY plot
 ggplot(m[keep==TRUE],aes(x=fdr,fill=variable)) +
   geom_histogram(aes(y = ..density..), position="dodge",binwidth=0.1,center=0.05) +
-  facet_grid(match~background,labeller=label_both, scales="free") + scale_fill_manual(values = myCols) +
+  facet_grid(match~background,labeller=label_both, scales="free") + scale_fill_manual(values = simCols) +
   ggtitle("twas FDR")
 
 #STANDARD plot
 ggplot(m[keep==TRUE],aes(x=fdr,fill=variable)) +
     geom_histogram(position="dodge",binwidth=0.1,center=0.05) +
-    facet_grid(match~background,labeller=label_both, scales="free") + scale_fill_manual(values = myCols) +
+    facet_grid(match~background,labeller=label_both, scales="free") + scale_fill_manual(values = simCols) +
     ggtitle("twas FDR")
 
     

@@ -7,25 +7,30 @@ setwd("~/D")
 source("seaborn_pal.R")
 files <- list.files(pattern="simv6",path="~/share/Projects/twas/simone",full=TRUE)
 message("files found: ",length(files))
-if(length(files)>10000)
-  files <- sample(files,10000)
+if(length(files)>1000 & interactive()) # for testing
+  files <- sample(files,1000)
 f=files[1]
 
-library(progress)
-pb <- progress_bar$new(total = length(files))
-results <- vector("list",length(files))
-for(i in seq_along(files)) {
-  pb$tick()
-  f <- files[i]
-  data=readRDS(f)
-  ## str(data)
-  betas <- as.list(data$key$beta[ unlist(data$key[c("e1","t")]) ])
-  names(betas) <- c("beta.e1","beta.t")
-  results[[i]] <- c(data$key[c("e1","t")],
-                    betas,
-                    as.list(data$twas))
+if(!file.exists("~/collateone.RData")) {
+  library(progress)
+  pb <- progress_bar$new(total = length(files))
+  results <- vector("list",length(files))
+  for(i in seq_along(files)) {
+    pb$tick()
+    f <- files[i]
+    data=readRDS(f)
+    ## str(data)
+    betas <- as.list(data$key$beta[ unlist(data$key[c("e1","t")]) ])
+    names(betas) <- c("beta.e1","beta.t")
+    results[[i]] <- c(data$key[c("e1","t")],
+                      betas,
+                      as.list(data$twas))
+  }
+  results %<>% rbindlist(.,fill=TRUE)
+  save(results, file="~/collateone.RData")
+} else {
+  load(file="~/collateone.RData")
 }
-results %<>% rbindlist(.,fill=TRUE)
 
 ## lasso constant fit
 head(results)
@@ -48,7 +53,6 @@ tmp <- results[e1=="A"]
 ## ggplot(tmp[lasso.p<1e-4],aes(x=lasso.est)) + geom_histogram() + geom_vline(xintercept=1,col="red")
 ## ggplot(tmp[rf.p<1],aes(x=rf.est)) + geom_histogram() + geom_vline(xintercept=1,col="red")
 ## ggplot(tmp,aes(x=rf.est,y=-log10(rf.p))) + geom_point() + geom_vline(xintercept=1,col="red")
-
 m <- melt(tmp,measure.vars=list(est=c("lasso.est","rf.est"),
                                 se=c("lasso.se","rf.se"),
                                 p=c("lasso.p","rf.p")
@@ -56,30 +60,35 @@ m <- melt(tmp,measure.vars=list(est=c("lasso.est","rf.est"),
 head(m)
 m[,method:=c("Lasso","RF")[variable]]
 
-p.effects <- ggplot(m,aes(y=est,ymin=est-1.96*se,ymax=est+1.96*se,
-               x=-log10(p),col=method)) +
-  geom_point(alpha=0.2) +
-  geom_linerange(lwd=0.2,alpha=0.2) +
-  geom_hline(yintercept=1,col="black") + 
-  geom_smooth(se=FALSE) +
-  ## facet_grid(method~.) +
-  labs(y="Ratio of estimated to true TWAS effect") +
-  xlim(0,40) +
-  scale_colour_seaborn("Method") +
-  background_grid(major="y") +
-  ## scale_y_log10() +
-  theme(legend.position="bottom",axis.line.y=element_blank())
+## p.effects <- ggplot(m,aes(y=est,ymin=est-1.96*se,ymax=est+1.96*se,
+##                x=-log10(p),col=method)) +
+##   geom_point(alpha=0.2) +
+##   geom_linerange(lwd=0.2,alpha=0.2) +
+##   geom_hline(yintercept=1,col="black") + 
+##   geom_smooth(se=FALSE) +
+##   ## facet_grid(method~.) +
+##   labs(y="Ratio of estimated to true TWAS effect") +
+##   xlim(0,40) +
+##   ## scale_colour_seaborn("Method") +
+##   scale_colour_manual(values=myCol) +
+##   background_grid(major="y") +
+##   ## scale_y_log10() +
+##   theme(legend.position="bottom",axis.line.y=element_blank())
 
-p.effects.log <- ggplot(m[est>1.96*se],aes(y=est,ymin=est-1.96*se,ymax=est+1.96*se,
+use <- c(sample(which(m$est>1.96*m$se & m$method=="Lasso"),2000),
+         sample(which(m$est>1.96*m$se & m$method=="RF"),2000))
+p.effects.log <- ggplot(m[use],
+                        aes(y=est,ymin=est-1.96*se,ymax=est+1.96*se,
                x=-log10(p),col=method)) +
-  geom_point(alpha=0.2) +
-  geom_linerange(lwd=0.2,alpha=0.2) +
+  geom_point(alpha=0.2,size=0.2) +
+  geom_linerange(lwd=0.1,alpha=0.2) +
   geom_hline(yintercept=1,col="black") + 
   geom_smooth(se=FALSE) +
   ## facet_grid(method~.) +
   labs(y="Relative TWAS effect estimate") +
   labs(x="-log10 P value",limits=c(0,40)) +
-  scale_colour_seaborn("Method") +
+  ## scale_colour_seaborn("Method") +
+  scale_colour_manual(values=myCol) +
   background_grid(major="y") +
   scale_y_log10() +
   theme(legend.position="bottom",axis.line.y=element_blank())
@@ -95,7 +104,8 @@ m[is.na(value),value:=1]
 ggplot(m,aes(x=value,fill=variable)) +
   geom_histogram(position="dodge") +
   facet_grid(e1 ~ .,scales="free_y") +
-  scale_fill_seaborn("Method") +
+  ## scale_fill_seaborn("Method") +
+  scale_fill_manual(values=myCol) +
   labs(x="P value") +
   background_grid(major="y") +
   theme(legend.position="bottom")
@@ -106,8 +116,10 @@ p.pvals <- ggplot(m[e1=="A"],aes(x=-log10(value))) +
   ## geom_density(aes(col=variable)) +
   ## facet_grid(e1 ~ .,scales="free_y") +
   labs(x="-log10 P value",limits=c(0,40)) +
-  scale_fill_seaborn("Method") +
-  scale_colour_seaborn("Method") +
+  ## scale_fill_seaborn("Method") +
+  ## scale_colour_seaborn("Method") +
+  scale_colour_manual(values=myCol) +
+  scale_fill_manual(values=myCol) +
   background_grid(major="y") +
   theme(legend.position="bottom",axis.line.y=element_blank())
 

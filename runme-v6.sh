@@ -67,4 +67,4 @@ for t in A ; do # AB
     done
 done
 
-Rscript collateone-v6.R
+qR.rb -r collateone-v6.R
